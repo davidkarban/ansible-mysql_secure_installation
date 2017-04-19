@@ -1,0 +1,49 @@
+---
+#- name: Load the OS specific variables
+#  tags: mysql
+#  include_vars: "{{ ansible_os_family }}.yml"
+
+# security hardening
+- name: update mysql root password for all root accounts
+  tags: 
+    - mysql
+    - mysql_passwords
+  mysql_user: name=root host={{ item }} password="{{ lookup('password', inventory_dir + '/credentials/' + ansible_fqdn + '/mysql_root_password length=64') }}"
+  with_items:
+   - "{{ ansible_hostname }}"
+   - 127.0.0.1
+   - ::1
+   - localhost
+  when: ansible_hostname != 'localhost'
+
+- name: update mysql root password for all root accounts
+  tags:
+    - mysql
+    - mysql_passwords
+  mysql_user: name=root host={{ item }} password={{ lookup('password', inventory_dir + '/credentials/' + ansible_fqdn + '/mysql_root_password') }}
+  with_items:
+   - 127.0.0.1
+   - ::1
+   - localhost
+  when: ansible_hostname == 'localhost'
+
+- name: copy .my.cnf file with root password credentials
+  tags: 
+    - mysql
+    - mysql_passwords
+  template: src=.my.cnf.j2 dest=/root/.my.cnf owner=root group=root mode=0600
+  with_password:
+    - "{{ inventory_dir + '/credentials/' + ansible_fqdn + '/mysql_root_password' }}"
+
+- name: ensure anonymous users are not in the database
+  tags: mysql
+  mysql_user: name='' host={{ item }} state=absent
+  with_items:
+   - localhost
+   - "{{ ansible_hostname }}"
+   
+- name: remove the test database
+  tags: mysql
+  mysql_db: name=test state=absent
+# end of security hardening
+
